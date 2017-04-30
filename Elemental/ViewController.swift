@@ -9,7 +9,7 @@
 import Cocoa
 import WebKit
 
-class ViewController: NSViewController, WKNavigationDelegate {
+class ViewController: NSViewController, WKNavigationDelegate, NSGestureRecognizerDelegate {
 
     var rows : NSStackView!
     var selectedWebView : WKWebView!
@@ -45,10 +45,34 @@ class ViewController: NSViewController, WKNavigationDelegate {
     
     @IBAction func urlEntered(_ sender: NSTextField){
     
+        // Bail out if we dont have a web view selected
+        guard let selected = selectedWebView else {return}
+        
+        // Attemp to convert the users url into a string
+        if let url = URL(string: sender.stringValue) {
+        
+            // It worked - load it
+            selected.load(URLRequest(url: url))
+        
+        }
+        
     }
     
     @IBAction func navigationClicked(_ sender: NSSegmentedControl){
     
+        guard let selected = selectedWebView else { return}
+        
+        if sender.selectedSegment == 0 {
+        
+
+            selected.goBack()
+            
+        }
+        else {
+        
+            selected.goForward()
+            
+        }
     }
     
     @IBAction func adjustRows(_ sender: NSSegmentedControl){
@@ -133,18 +157,39 @@ class ViewController: NSViewController, WKNavigationDelegate {
         webView.configuration.preferences.javaEnabled = true
 //        webView.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         webView.load(URLRequest(url: URL(string: "https://www.apple.com")!))
+        
+        // 2 ways to disambiguate click
+        
+        // Method 1
+//        let recognizer = NSClickGestureRecognizer(target: self, action: #selector(webViewClicked) )
+//        // Made clicks required to 2 as 1 was stopping the user from clicking links on the web page
+//        recognizer.numberOfClicksRequired = 2
+//        webView.addGestureRecognizer(recognizer)
+        
+        // Method 2
         let recognizer = NSClickGestureRecognizer(target: self, action: #selector(webViewClicked) )
-        recognizer.numberOfClicksRequired = 1
+        // Made clicks required to 2 as 1 was stopping the user from clicking links on the web page
+        recognizer.delegate = self
         webView.addGestureRecognizer(recognizer)
+        
+        if selectedWebView == nil {
+        
+            selectView(webView: webView)
+        }
+        
         return webView
     }
 
     func selectView(webView: WKWebView) {
     
         selectedWebView = webView
-        selectedWebView.layer?.borderWidth = 2
-        selectedWebView.layer?.borderColor = NSColor.red.cgColor
-        selectedWebView.layer?.opacity = 0.8
+        selectedWebView.layer?.opacity = 1
+        
+        if let windowController = view.window?.windowController as? WindowController {
+        
+            windowController.addressEntry.stringValue = selectedWebView.url?.absoluteString ?? ""
+        
+        }
     
     }
     
@@ -155,11 +200,32 @@ class ViewController: NSViewController, WKNavigationDelegate {
         
         // Deselect the currently selectedweb viewif there is one
         if let selected = selectedWebView {
-            selected.layer?.borderWidth = 0
-            selected.layer?.opacity = 1.0
+            selected.layer?.opacity = 0.8
         }
         
         selectView(webView: newSelectedWebView)
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer, shouldAttemptToRecognizeWith event: NSEvent) -> Bool {
+        
+        if  gestureRecognizer.view  == selectedWebView {
+        
+            return false
+            
+        } else {
+        
+            return true
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        guard webView == selectedWebView else { return }
+        
+        if let windowController = view.window?.windowController as? WindowController {
+            
+            windowController.addressEntry.stringValue = selectedWebView.url?.absoluteString ?? ""
+            
+        }
     }
 }
 
